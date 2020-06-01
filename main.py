@@ -13,7 +13,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from apex import amp
 from torch import nn
 
 import dataset
@@ -222,6 +221,9 @@ def parse_args():
 
     if args.seed is None:
         args.seed = random.randint(0, 10 ** 9)
+        
+    if args.fp16:
+        from apex import amp
 
     return args
 
