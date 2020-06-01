@@ -12,20 +12,24 @@ class Model(nn.Module):
 
         kwargs = {}
         backbone = args.backbone
-        if args.backbone.startswith('mem-'):
-            kwargs['memory_efficient'] = True
+        if args.backbone.startswith("mem-"):
+            kwargs["memory_efficient"] = True
             backbone = args.backbone[4:]
 
-        if backbone.startswith('densenet'):
-            channels = 96 if backbone == 'densenet161' else 64
+        if backbone.startswith("densenet"):
+            channels = 96 if backbone == "densenet161" else 64
             first_conv = nn.Conv2d(6, channels, 7, 2, 3, bias=False)
-            pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True, **kwargs)
+            pretrained_backbone = getattr(torchvision.models, backbone)(
+                pretrained=True, **kwargs
+            )
             self.features = pretrained_backbone.features
             self.features.conv0 = first_conv
             features_num = pretrained_backbone.classifier.in_features
-        elif backbone.startswith('resnet') or backbone.startswith('resnext'):
+        elif backbone.startswith("resnet") or backbone.startswith("resnext"):
             first_conv = nn.Conv2d(6, 64, 7, 2, 3, bias=False)
-            pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True, **kwargs)
+            pretrained_backbone = getattr(torchvision.models, backbone)(
+                pretrained=True, **kwargs
+            )
             self.features = nn.Sequential(
                 first_conv,
                 pretrained_backbone.bn1,
@@ -37,15 +41,23 @@ class Model(nn.Module):
                 pretrained_backbone.layer4,
             )
             features_num = pretrained_backbone.fc.in_features
-        elif backbone.startswith('efficientnet'):
+        elif backbone.startswith("efficientnet"):
             from efficientnet_pytorch import EfficientNet
+
             self.efficientnet = EfficientNet.from_pretrained(backbone)
-            first_conv = nn.Conv2d(6, self.efficientnet._conv_stem.out_channels, kernel_size=3, stride=2, padding=1, bias=False)
+            first_conv = nn.Conv2d(
+                6,
+                self.efficientnet._conv_stem.out_channels,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                bias=False,
+            )
             self.efficientnet._conv_stem = first_conv
             self.features = self.efficientnet.extract_features
             features_num = self.efficientnet._conv_head.out_channels
         else:
-            raise ValueError('wrong backbone')
+            raise ValueError("wrong backbone")
 
         self.concat_cell_type = args.concat_cell_type
         self.classes = args.classes
@@ -66,12 +78,16 @@ class Model(nn.Module):
             self.head = nn.Linear(args.embedding_size, args.classes)
         else:
             self.head = []
-            for input_size, output_size in zip([args.embedding_size] + args.head_hidden, args.head_hidden):
-                self.head.extend([
-                    nn.Linear(input_size, output_size, bias=False),
-                    nn.BatchNorm1d(output_size),
-                    nn.ReLU(),
-                ])
+            for input_size, output_size in zip(
+                [args.embedding_size] + args.head_hidden, args.head_hidden
+            ):
+                self.head.extend(
+                    [
+                        nn.Linear(input_size, output_size, bias=False),
+                        nn.BatchNorm1d(output_size),
+                        nn.ReLU(),
+                    ]
+                )
             self.head.append(nn.Linear(args.head_hidden[-1], args.classes))
             self.head = nn.Sequential(*self.head)
 
@@ -170,7 +186,7 @@ class ArcMarginProduct(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1.0 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
 
     def forward(self, features):

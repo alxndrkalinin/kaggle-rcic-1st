@@ -25,22 +25,28 @@ class Dataset:
         self.controls = {}
 
         path = Path(path)
-        for is_control, file in [(0, 'train.csv'), (1, 'train_controls.csv'), (1, 'test_controls.csv')]:
+        for is_control, file in [
+            (0, "train.csv"),
+            (1, "train_controls.csv"),
+            (1, "test_controls.csv"),
+        ]:
             csv = pd.read_csv(path / file)
             for row in csv.iterrows():
                 r = row[1]
-                (self.controls if is_control else self.data)[self.split(r.id_code)] = r.sirna
+                (self.controls if is_control else self.data)[
+                    self.split(r.id_code)
+                ] = r.sirna
 
         # HUVEC-18 leak
-        for file in ['test.csv']:
+        for file in ["test.csv"]:
             csv = pd.read_csv(path / file)
             for row in csv.iterrows():
                 r = row[1]
-                if self.split(r.id_code)[0:2] == ('HUVEC', '18'):
+                if self.split(r.id_code)[0:2] == ("HUVEC", "18"):
                     s = self.split(r.id_code)
                     s = list(s)
-                    s[0] = 'RPE'
-                    s[1] = '03'
+                    s[0] = "RPE"
+                    s[1] = "03"
                     s[2] = (s[2] - 1) % 4
                     s = tuple(s)
                     assert self.data[s] < self.CLASSES
@@ -52,15 +58,22 @@ class Dataset:
     def split(id_code):
         """Return (cell_type, experiment number of given cell type, plate number, well)"""
 
-        a = id_code.find('-')
-        b = id_code.find('_')
-        c = id_code.rfind('_')
-        return id_code[:a], id_code[a + 1:b], int(id_code[b + 1:c]) - 1, id_code[c + 1:]
+        a = id_code.find("-")
+        b = id_code.find("_")
+        c = id_code.rfind("_")
+        return (
+            id_code[:a],
+            id_code[a + 1 : b],
+            int(id_code[b + 1 : c]) - 1,
+            id_code[c + 1 :],
+        )
 
     def _get_groups(self):
         """Calculate class groups that are on plates and assignment for the labeled set"""
 
-        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: 0))))
+        data = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: 0)))
+        )
         for (serie, exper, plate, _), sirna in self.data.items():
             data[serie][exper][plate][sirna] += 1
 
@@ -88,7 +101,7 @@ class Dataset:
                     g = sc.index(max(sc))
                     gs.append(g)
                 assignment[(serie, exper)] = tuple(gs)
-                assert(sorted(gs) == [0, 1, 2, 3])
+                assert sorted(gs) == [0, 1, 2, 3]
 
         return groups, assignment
 
@@ -96,7 +109,9 @@ class Dataset:
         """Find group assignments as dictionary in format {code_id: list_of_classes}"""
 
         ret = {}
-        for exper_name, exper in groupby(sorted(data), key=lambda x: self.split(x[0])[:2]):
+        for exper_name, exper in groupby(
+            sorted(data), key=lambda x: self.split(x[0])[:2]
+        ):
             exper = list(exper)
             ks, vs = [], []
             for _, v in groupby(sorted(exper), key=lambda x: self.split(x[0])[2]):
@@ -110,7 +125,10 @@ class Dataset:
             for v in vs:
                 v = np.array(v)
                 v = v.argmax(1)
-                sc = [len(list(filter(lambda x: x in g, v))) for g in map(set, self.groups)]
+                sc = [
+                    len(list(filter(lambda x: x in g, v)))
+                    for g in map(set, self.groups)
+                ]
                 scs.append(sc)
             # scs[i][j] -- number of best classes that are on i-th plate and are in j-th class group
 
@@ -131,14 +149,22 @@ class Dataset:
 
             if exper_name in self.group_assignment:
                 if self.group_assignment[exper_name] == best_perm:
-                    assignment_type = 'correct_assignment'
+                    assignment_type = "correct_assignment"
                 else:
-                    assignment_type = 'incorrect_assignment'
+                    assignment_type = "incorrect_assignment"
             else:
-                assignment_type = 'prediction'
+                assignment_type = "prediction"
 
-            logging.info('groups: {:8} -> {} ( score: {:.5f}  conf: {:.5f} ) {}  size: {}'.format(
-                '-'.join(exper_name), best_perm, score, conf, assignment_type, sum(map(len, ks))))
+            logging.info(
+                "groups: {:8} -> {} ( score: {:.5f}  conf: {:.5f} ) {}  size: {}".format(
+                    "-".join(exper_name),
+                    best_perm,
+                    score,
+                    conf,
+                    assignment_type,
+                    sum(map(len, ks)),
+                )
+            )
 
             for i, k in enumerate(ks):
                 for n in k:
@@ -164,8 +190,15 @@ class Dataset:
 
         if total == 0:
             return 0, {}
-        return correct_hits / total, dict(map(lambda x: (x[0][0], x[0][1] / x[1][1] if x[1][1] != 0 else 0),
-            zip(correct_hits_exper.items(), total_exper.items())))
+        return (
+            correct_hits / total,
+            dict(
+                map(
+                    lambda x: (x[0][0], x[0][1] / x[1][1] if x[1][1] != 0 else 0),
+                    zip(correct_hits_exper.items(), total_exper.items()),
+                )
+            ),
+        )
 
 
 class PredictionGroup:
@@ -174,8 +207,8 @@ class PredictionGroup:
             x = x.items()
         self.data = []
         for k, v in x:
-            for pred in (v if isinstance(v, list) else [v]):
-                self.data.append((k, pred[:Dataset.CLASSES]))
+            for pred in v if isinstance(v, list) else [v]:
+                self.data.append((k, pred[: Dataset.CLASSES]))
 
     def __len__(self):
         return len(self.data)
@@ -188,7 +221,9 @@ class PredictionGroup:
             f = lambda x: x.sum(0)
 
         r = {}
-        for code_id, iterable in groupby(sorted(self.data, key=lambda x: x[0]), key=lambda x: x[0]):
+        for code_id, iterable in groupby(
+            sorted(self.data, key=lambda x: x[0]), key=lambda x: x[0]
+        ):
             iterable = list(iterable)
             pred = np.array(list(map(lambda x: x[1], iterable)))
             r[code_id] = f(pred)
@@ -198,7 +233,9 @@ class PredictionGroup:
         r = []
         for code_id, pred in self:
             new_pred = pred.copy()
-            new_pred[list(set(range(len(new_pred))) - set(assignment[code_id]))] = -np.inf
+            new_pred[
+                list(set(range(len(new_pred))) - set(assignment[code_id]))
+            ] = -np.inf
             r.append((code_id, new_pred))
         return PredictionGroup(r)
 
@@ -213,8 +250,12 @@ class PredictionGroup:
         return [(k, v.item()) for (k, _), v in zip(plate, indices)]
 
     def assign_unique(self, pool=__builtins__):
-        plates = (list(plate) for _, plate in groupby(sorted(self, key=itemgetter(0)),
-            key=lambda x: Dataset.split(x[0])[:3]))
+        plates = (
+            list(plate)
+            for _, plate in groupby(
+                sorted(self, key=itemgetter(0)), key=lambda x: Dataset.split(x[0])[:3]
+            )
+        )
         return chain(*pool.map(self._assign_unique_in_plate, plates))
 
     def concat(*args):
@@ -244,19 +285,19 @@ class Prediction:
 
         else:
             if isinstance(data, Path) or isinstance(data, str):
-                with Path(data).open('rb') as f:
+                with Path(data).open("rb") as f:
                     data = pickle.load(f)
 
-            self.val = PredictionGroup(data['val'])
-            self.test = PredictionGroup(data['test'])
+            self.val = PredictionGroup(data["val"])
+            self.test = PredictionGroup(data["test"])
 
     def _map(self, f):
         if isinstance(self, Prediction):
             return Prediction(f(self.val), f(self.test))
         else:
             return Prediction(
-                    f(list(map(lambda x: x.val, self))),
-                    f(list(map(lambda x: x.test, self))),
+                f(list(map(lambda x: x.val, self))),
+                f(list(map(lambda x: x.test, self))),
             )
 
     def combine(self, *args, **kwargs):
@@ -274,13 +315,16 @@ class Prediction:
     def map(self, *args, **kwargs):
         return self._map(lambda x: x.map(*args, **kwargs))
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=Path, default=Path('../data/'))
-    parser.add_argument('-t', '--threads', type=int, default=12)
-    parser.add_argument('-w', '--weights', type=lambda x: list(map(float, x.split(','))))
-    parser.add_argument('-o', '--output', type=Path, required=True)
-    parser.add_argument('files', nargs='+', type=Path)
+    parser.add_argument("--data", type=Path, default=Path("../data/"))
+    parser.add_argument("-t", "--threads", type=int, default=12)
+    parser.add_argument(
+        "-w", "--weights", type=lambda x: list(map(float, x.split(",")))
+    )
+    parser.add_argument("-o", "--output", type=Path, required=True)
+    parser.add_argument("files", nargs="+", type=Path)
     args = parser.parse_args()
 
     if args.weights is None:
@@ -288,40 +332,62 @@ def parse_args():
 
     return args
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     args = parse_args()
-    logging.basicConfig(level=logging.DEBUG, format='{asctime}:{levelname}: {message}', style='{',
-            handlers=[logging.StreamHandler(sys.stderr)])
-    logging.info('Args: {}'.format(args))
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="{asctime}:{levelname}: {message}",
+        style="{",
+        handlers=[logging.StreamHandler(sys.stderr)],
+    )
+    logging.info("Args: {}".format(args))
 
     pool = Pool(args.threads)
 
-    logging.info('Loading dataset')
+    logging.info("Loading dataset")
     dataset = Dataset(args.data)
 
-    logging.info('Loading predictions')
+    logging.info("Loading predictions")
     preds = []
     for i, file in enumerate(args.files):
         pred = Prediction(args.files[i])
         pred = pred.combine()
         score = dataset.accuracy(pred.val.assign_argmax())
         preds.append(pred)
-        logging.info('File {} -> score: {}'.format(args.files[i], score))
+        logging.info("File {} -> score: {}".format(args.files[i], score))
 
-
-    preds = list(map(lambda p: p[0].map(lambda x: (x * p[1])), zip(preds, args.weights)))
+    preds = list(
+        map(lambda p: p[0].map(lambda x: (x * p[1])), zip(preds, args.weights))
+    )
     pred = Prediction.concat(*preds)
 
-    logging.info('Evaluating...')
-    logging.info('Average score:                       {}'.format(dataset.accuracy(pred.val.assign_argmax())))
+    logging.info("Evaluating...")
+    logging.info(
+        "Average score:                       {}".format(
+            dataset.accuracy(pred.val.assign_argmax())
+        )
+    )
     pred = pred.combine()
-    logging.info('Score after ensemble:                {}'.format(dataset.accuracy(pred.val.assign_argmax())))
+    logging.info(
+        "Score after ensemble:                {}".format(
+            dataset.accuracy(pred.val.assign_argmax())
+        )
+    )
     pred = pred.retain_plate_classes(dataset)
-    logging.info('Score after retaining plate classes: {}'.format(dataset.accuracy(pred.val.assign_argmax())))
-    logging.info('Score after linear sum assignment:   {}'.format(dataset.accuracy(pred.val.assign_unique(pool=pool))))
+    logging.info(
+        "Score after retaining plate classes: {}".format(
+            dataset.accuracy(pred.val.assign_argmax())
+        )
+    )
+    logging.info(
+        "Score after linear sum assignment:   {}".format(
+            dataset.accuracy(pred.val.assign_unique(pool=pool))
+        )
+    )
 
-    logging.info('Saving csv submission into {}'.format(args.output))
-    with args.output.open('w') as f:
-        print('id_code,sirna', file=f)
+    logging.info("Saving csv submission into {}".format(args.output))
+    with args.output.open("w") as f:
+        print("id_code,sirna", file=f)
         for k, v in sorted(pred.test.assign_unique(pool=pool)):
-            print(','.join([str(k), str(v)]), file=f)
+            print(",".join([str(k), str(v)]), file=f)
