@@ -197,18 +197,19 @@ class CellularDataset(Dataset):
         self.mode = mode
 
         csv = pd.read_csv(
-            self.root / ("train.csv" if mode in ["train", "val"] else "test.csv")
+            self.root / ("kaggle_train.csv" if mode in ["train", "val"] else "kaggle_test.csv")
         )
         csv_controls = pd.read_csv(
             self.root
             / (
-                "train_controls.csv"
+                "kaggle_train_controls.csv"
                 if mode in ["train", "val"]
-                else "test_controls.csv"
+                else "kaggle_test_controls.csv"
             )
         )
         if all_controls:
-            csv_controls_test = pd.read_csv(self.root / "test_controls.csv")
+            csv_controls_test = pd.read_csv(self.root / "kaggle_test_controls.csv")
+        
         self.data = []  # (experiment, plate, well, site, cell_type, sirna or None)
         experiments = {}
         for row in chain(
@@ -238,13 +239,16 @@ class CellularDataset(Dataset):
                     r.sirna if hasattr(r, "sirna") else None,
                 )
             )
+            if hasattr(r, "sirna"):
+                r.sirna = int(r.sirna)
             if not hasattr(r, "sirna") or r.sirna < self.treatment_classes:
                 if typ not in experiments:
                     experiments[typ] = set()
                 experiments[typ].add(r.experiment)
+        
         if mode in ["train", "val"]:
             data_dict = {(e, p, w): sir for e, p, w, s, typ, sir in self.data}
-            for row in pd.read_csv(self.root / "test.csv").iterrows():
+            for row in pd.read_csv(self.root / "kaggle_test.csv").iterrows():
                 r = row[1]
                 typ = r.experiment[: r.experiment.find("-")]
                 if r.experiment == "HUVEC-18":
@@ -256,12 +260,16 @@ class CellularDataset(Dataset):
                         experiments[typ] = set()
                     experiments[typ].add(r.experiment)
             if not all_controls:
-                for row in pd.read_csv(self.root / "test_controls.csv").iterrows():
+                for row in pd.read_csv(self.root / "kaggle_test_controls.csv").iterrows():
                     r = row[1]
                     typ = r.experiment[: r.experiment.find("-")]
                     if r.experiment == "HUVEC-18":
                         sirna = data_dict[("RPE-03", (r.plate - 2) % 4 + 1, r.well)]
-                        assert sirna == r.sirna or sirna == 1138 or r.sirna == 1138
+                        try:
+                            assert sirna == r.sirna or sirna == 1138 or r.sirna == 1138
+                        except AssertionError:
+                            print(f'sirna: {sirna}, r.sirna: {r.sirna}')
+                            exit(1)
                         self.data.append(
                             (r.experiment, r.plate, r.well, 1, typ, r.sirna)
                         )
@@ -385,7 +393,8 @@ class CellularDataset(Dataset):
                 if path.exists():
                     break
             else:
-                assert 0
+                print(f"\nPath does not exist: {path}\n")
+                raise FileNotFoundError(f"\nPath does not exist: {path}\n")
             images.append(cv2.imread(str(path), cv2.IMREAD_GRAYSCALE))
             assert images[-1] is not None
         image = np.stack(images, axis=-1)
