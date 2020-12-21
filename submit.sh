@@ -1,0 +1,1 @@
+python make_submission.py  -o results/submit_jun23_psulbl.csv --data /home/user/data/rxrx1/images/ results/dn161_1.4.output

@@ -76,7 +76,7 @@ def parse_args():
     parser.add_argument(
         "--fp16",
         type=bool_type,
-        default=True,
+        default=False,
         help="mixed precision training/inference",
     )
     parser.add_argument(
@@ -574,6 +574,7 @@ def train(args, model):
 
         logging.info("Train: epoch {}   avg_norm: {}".format(epoch, avg_norm))
 
+        print(f'GRAD: {torch.is_grad_enabled()}')
         model.train()
         optimizer.zero_grad()
 

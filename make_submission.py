@@ -26,9 +26,9 @@ class Dataset:
 
         path = Path(path)
         for is_control, file in [
-            (0, "train.csv"),
-            (1, "train_controls.csv"),
-            (1, "test_controls.csv"),
+            (0, "kaggle_train.csv"),
+            (1, "kaggle_train_controls.csv"),
+            (1, "kaggle_test_controls.csv"),
         ]:
             csv = pd.read_csv(path / file)
             for row in csv.iterrows():
@@ -38,7 +38,7 @@ class Dataset:
                 ] = r.sirna
 
         # HUVEC-18 leak
-        for file in ["test.csv"]:
+        for file in ["kaggle_test.csv"]:
             csv = pd.read_csv(path / file)
             for row in csv.iterrows():
                 r = row[1]
@@ -49,7 +49,13 @@ class Dataset:
                     s[1] = "03"
                     s[2] = (s[2] - 1) % 4
                     s = tuple(s)
-                    assert self.data[s] < self.CLASSES
+                    try:
+                        assert self.data[s] < self.CLASSES
+                    except: 
+                        print(s)
+                        print(self.data[s])
+                        print(self.CLASSES)
+                        
                     self.data[self.split(r.id_code)] = self.data[s]
 
         self.groups, self.group_assignment = self._get_groups()
